@@ -10,7 +10,7 @@ String fridgeAddrStr;
 String tempsStr;
 Sensor* sensors[5];
 String sensorStr;
-String platform = "Myapp";
+String appname = "beermentor";
 
 void cloudInit() {
     Particle.function("assign", assignSensor);
@@ -22,7 +22,7 @@ void cloudInit() {
     Particle.variable("beerAddr", beerAddrStr);
     Particle.variable("fridgeAddr", fridgeAddrStr);
     Particle.variable("temps", tempsStr);
-    Particle.variable("id", platform);
+    Particle.variable("id", appname);
     Particle.variable("target", targetTemp);
 }
 
@@ -83,7 +83,6 @@ int assignSensor(String command) {
     }
     else return -2;
 
-    sensors[sensorNumber]->setLabel(name.c_str());
     memcpy(dest, sensors[sensorNumber]->addr, 8);
     return 0;
 }
@@ -109,9 +108,9 @@ int updateTarget(String command) {
 	tgt = strtod(command, NULL);
 	if (tgt == 0) return 2;
 	targetTemp = constrain(tgt, pidConfig.targetMin, pidConfig.targetMax);
-	Serial.printf("new tgt temp: %.2f", tgt);
+	Serial.printf("New target temp: %.2f", tgt);
 	if (targetTemp != tgt) {
-		Serial.printf(" contrained to %.2f\r\n", targetTemp);
+		Serial.printf(" constrained to %.2f\r\n", targetTemp);
 		return 1;
 	}
 	Serial.println();
