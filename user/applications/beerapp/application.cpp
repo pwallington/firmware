@@ -40,7 +40,7 @@ void setup() {
     pidController = new PIDControl();
     fridgeActuator = new FridgeActuator();
     delay(500);
-//    controlTimer.start();
+    controlTimer.start();
 
 }
 
@@ -71,11 +71,6 @@ void timerRoutine() {
 void loop() {
 	static unsigned long last = 0;
 	unsigned long now = millis();
-
-	if ((now - last) > INTERVAL) {
-		last = now;
-		timerRoutine();
-	}
 
 	// Handle door open/close ISR flag
     if (doorChanged) {
