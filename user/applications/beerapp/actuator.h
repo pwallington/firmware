@@ -11,9 +11,6 @@
 #include "application.h"
 #include "config.h"
 
-// ISR handling for door state changes - debounce logic is in main loop()
-extern volatile bool doorChanged;
-void doorISR ();
 
 
 //TODO: Implement wait state logic
@@ -37,9 +34,20 @@ class FridgeActuator {
 	private:
 		unsigned long lastStateChangeTime = 0;
 		FridgeState currentState;
-		bool doorIsOpen;
+
+		void doorISR();
+		Timer* debounceTimer;
+
+		Timer* minStateTimer;
+		Timer* maxStateTimer;
+		void minStateTimeExceeded();
+		void maxStateTimeExceeded();
+		bool stateActive = false;
 };
 
+// ISR handling for door state changes - debounce logic is in main loop()
+void doorISR ();
+extern FridgeActuator* fridgeActuator;
 
 
 #endif /* USER_APPLICATIONS_MYAPP_ACTUATOR_H_ */

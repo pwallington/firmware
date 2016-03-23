@@ -68,17 +68,3 @@ void timerRoutine() {
     publishStatus(beerTemp, fridgeTemp, ret);
 
 }
-void loop() {
-	static unsigned long last = 0;
-	unsigned long now = millis();
-
-	// Handle door open/close ISR flag
-    if (doorChanged) {
-    	Serial.println("Saw door state change from ISR!!");
-        // debounce - 'extra' ISRs will happen during the delay.
-        delay(50);
-        doorChanged = false;
-        fridgeActuator->doorOpen();
-    }
-
-}
