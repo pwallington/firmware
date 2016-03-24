@@ -5,12 +5,14 @@
 // Cloud variables
 double beerTemp;
 double fridgeTemp;
-String beerAddrStr;
-String fridgeAddrStr;
+char beerAddrStr[20] = {0,};
+char fridgeAddrStr[20] = {0,};
+
 String tempsStr;
 Sensor* sensors[5];
+unsigned int sensorCount = 0;
 String sensorStr;
-String appname = "beermentor";
+String appname = "beermentor_pub";
 
 void cloudInit() {
     Particle.function("assign", assignSensor);
@@ -52,43 +54,65 @@ int enumerate(String command) {
 		if (res) { sensorStr.concat("; "); };
 	}
 	Serial.println(sensorStr);
-	return i;
+	sensorCount = i;
+	return sensorCount;
 }
 
 /* Assign a sensor (by index) to a role */
 int assignSensor(String command) {
+    Serial.print("Assign sensors: ");
     Serial.println(command);
-    //convert ASCII to integer
-    unsigned int sensorNumber = command.charAt(0) - '0';
-    //Sanity check to see if the pin numbers are within limits
-    if (sensorNumber < 0 || sensorNumber > arraySize(sensors)) return -1;
 
-    uint8_t* dest;
-    String name;
-    if(command.substring(2,6) == "beer") {
-        dest = beerAddr;
-        name = "beer";
-        beerAddrStr = "";
-        for(int j=0; j<8; j++) {
-            beerAddrStr.concat(String::format("%02X", sensors[sensorNumber]->addr[j]));
-        }
-    }
-    else if(command.substring(2,8) == "fridge") {
-        dest = fridgeAddr;
-        name = "fridge";
-        fridgeAddrStr = "";
-        for(int j=0; j<8; j++) {
-            fridgeAddrStr.concat(String::format("%02X", sensors[sensorNumber]->addr[j]));
-        }
-    }
-    else return -2;
+    // Tokenize the string
+    char cmd[64] = {0,};
+    strncpy(cmd, command.c_str(), 63);
+    char* tok = strtok(cmd, " ");
 
-    memcpy(dest, sensors[sensorNumber]->addr, 8);
+
+    while (tok) {
+    	uint8_t* tgtAddr;
+    	char* 	 tgtStr;
+    	const char* name;
+
+		//convert ASCII to integer
+		unsigned int sensorNumber = tok[0] - '0';
+
+		//Sanity check to see if the pin numbers are within limits
+		if (sensorNumber < 0 || sensorNumber >= sensorCount) {
+			return -1;
+		}
+
+		if(tok[2] == 'b') {
+			tgtAddr = beerAddr;
+			tgtStr  = beerAddrStr;
+			name = "beer";
+		}
+		else if(tok[2] == 'f') {
+			tgtAddr = fridgeAddr;
+			tgtStr  = fridgeAddrStr;
+			name = "fridge";
+		}
+		else return -2;
+
+		memcpy(tgtAddr, sensors[sensorNumber]->addr, 8);
+		sprintf(tgtStr, "%02X-%02X%02X%02X %02X%02X%02X%02X",
+					sensors[sensorNumber]->addr[0],
+					sensors[sensorNumber]->addr[1],
+					sensors[sensorNumber]->addr[2],
+					sensors[sensorNumber]->addr[3],
+					sensors[sensorNumber]->addr[4],
+					sensors[sensorNumber]->addr[5],
+					sensors[sensorNumber]->addr[6],
+					sensors[sensorNumber]->addr[7]);
+
+		Serial.printf("Assigned sensor %d to \"%s\" (%s)\r\n", sensorNumber, name, tgtStr);
+		tok = strtok(NULL, " ");
+    }
     return 0;
 }
 
 /* Get temperature readings, and format them for the cloud variable */
-int updateTemps(String command){
+int updateTemps(String command) {
     if (beerAddr[0] != 0x28 || fridgeAddr[0] != 0x28) {
     	Serial.println("Sensors not set up yet...");
         return -2;
@@ -118,6 +142,7 @@ int updateTarget(String command) {
 }
 
 int publishStatus(double beerTemp, double fridgeTemp, int state) {
-	return Particle.publish("status", String::format("{ beerTemp: %.2f, fridgeTemp: %.2f, state: %s }",
-		beerTemp, fridgeTemp, actuatorConfig.stateNames[state]), 60, PRIVATE);
+	Particle.publish("status", String::format("{ beerTemp: %.2f, fridgeTemp: %.2f, state: %s }",
+		beerTemp, fridgeTemp, actuatorConfig.stateNames[state]));
+	return 0;
 }

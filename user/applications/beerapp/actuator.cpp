@@ -8,7 +8,7 @@
 #include "actuator.h"
 #include "config.h"
 
-#define STARTUP_TIMEOUT 10 * 1000
+#define INIT_TIME 10 * 1000
 
 ActuatorConfig actuatorConfig;
 
@@ -24,19 +24,22 @@ void FridgeActuator::doorOpen() {
 					(open ? "HIGH" : "LOW"),
 					(currentState == HEATING || !open) ? "LOW" : "HIGH");
 	digitalWrite(HEAT_PIN, (currentState == HEATING || !open));
+	Particle.publish(open ? "doorOpened" : "doorClosed");
 }
 
 FridgeState FridgeActuator::changeState(FridgeState newState) {
 	lastStateChangeTime = millis();
+	Serial.printf("Actuator changing from state %s to %s\r\n",
+										actuatorConfig.stateNames[currentState],
+										actuatorConfig.stateNames[newState]);
+	Particle.publish("stateChange", String::format("%s --> %s",
+											actuatorConfig.stateNames[currentState],
+											actuatorConfig.stateNames[newState]));
 	if (newState == currentState) {
 		Serial.printf("Ignoring state change request to current state of %s.\r\n",
 							actuatorConfig.stateNames[currentState]);
 		return currentState;
 	}
-	Serial.printf("Actuator changing from state %s to %s\r\n",
-										actuatorConfig.stateNames[currentState],
-										actuatorConfig.stateNames[newState]);
-
 	currentState = newState;
 
 	minStateTimer->changePeriod(1000*actuatorConfig.stateTimes[currentState][0]);
@@ -59,12 +62,13 @@ FridgeActuator::FridgeActuator() : currentState(IDLE) {
 
     pinMode(DOOR_PIN, INPUT_PULLUP);
 
+    // TODO: Deprecate lastStateChangeTime
 	lastStateChangeTime = millis();
 
 	// Initialise timers
-	debounceTimer = new Timer(40, 				&FridgeActuator::doorOpen, 				*this, true);
-	minStateTimer = new Timer(STARTUP_TIMEOUT, 	&FridgeActuator::minStateTimeExceeded, 	*this, true);
-	maxStateTimer = new Timer(1000, 			&FridgeActuator::maxStateTimeExceeded, 	*this, true);
+	debounceTimer = new Timer(40, 		 &FridgeActuator::doorOpen,				*this, true);
+	minStateTimer = new Timer(INIT_TIME, &FridgeActuator::minStateTimeExceeded, *this, true);
+	maxStateTimer = new Timer(1000, 	 &FridgeActuator::maxStateTimeExceeded, *this, true);
 	minStateTimer->start();
 
     attachInterrupt(DOOR_PIN, &FridgeActuator::doorISR, this, CHANGE);
