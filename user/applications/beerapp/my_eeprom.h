@@ -1,11 +1,9 @@
-struct EepromObj_v1 {
+#define EEPROM_VER 1
+struct EepromObj {
 	uint8_t eepromVersion;
 	uint8_t beerAddr[8];
 	uint8_t fridgeAddr[8];
 	double targetTemp;
-	char tempProfile[128];
-//	PIDConfig pidConfig;
-//	ActuatorConfig fridgeConfig;
 };
 
 /****************************************/
@@ -14,21 +12,42 @@ struct EepromObj_v1 {
 /*			or maybe just love			*/
 /****************************************/
 
-int readEeprom() {
-	uint8_t _eepromVersion;
-	uint8_t _beerAddr[8];
-	uint8_t _fridgeAddr[8];
-	double _targetTemp;
-	char _tempProfile[128];
-
-	EEPROM.get(0, _eepromVersion);
-	if (_eepromVersion == 1) {
-		EEPROM.get(offsetof(EepromObj_v1, beerAddr), _beerAddr);
-		EEPROM.get(offsetof(EepromObj_v1, fridgeAddr), _fridgeAddr);
-		EEPROM.get(offsetof(EepromObj_v1, targetTemp), _targetTemp);
-		EEPROM.get(offsetof(EepromObj_v1, tempProfile), _tempProfile);
-		return 0;
+int storeEeprom() {
+	if (beerAddr[0] != 0x28 || fridgeAddr[0] != 0x28) {
+		Serial.println("Sensors not yet assigned - not storing EEPROM config");
+		return 1;
 	}
-	return -1;
+	EepromObj storeObj;
+	storeObj.eepromVersion = EEPROM_VER;
+	memcpy(storeObj.beerAddr, beerAddr, 8);
+	memcpy(storeObj.fridgeAddr, fridgeAddr, 8);
+	storeObj.targetTemp = targetTemp;
+	EEPROM.put(0,storeObj);
+	return 0;
+}
+
+int readEeprom() {
+	EepromObj obj;
+
+	EEPROM.get(0, obj);
+	if (obj.eepromVersion != EEPROM_VER) {
+		Serial.println("Eeprom version not matched!");
+		return 1;
+	}
+
+	if (obj.beerAddr[0] != 0x28) {
+		Serial.println("Beer address family not matched!");
+	} else {
+		memcpy(beerAddr, obj.beerAddr, 8);
+	}
+
+	if (obj.fridgeAddr[0] != 0x28) {
+		Serial.println("Fridge address family not matched!");
+	} else {
+		memcpy(fridgeAddr, obj.fridgeAddr, 8);
+	}
+
+	targetTemp = constrain(obj.targetTemp, pidConfig.targetMin, pidConfig.targetMax);
+	return 0;
 }
 
