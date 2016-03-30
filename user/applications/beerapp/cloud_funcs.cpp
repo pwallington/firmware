@@ -8,11 +8,11 @@ double fridgeTemp;
 char beerAddrStr[20] = {0,};
 char fridgeAddrStr[20] = {0,};
 
-String tempsStr;
+char tempsStr[25];
 Sensor* sensors[5];
 unsigned int sensorCount = 0;
-String sensorStr;
-String appname = "beermentor_pub";
+char sensorStr[84];
+char appname[] = "beermentor_pub";
 
 void cloudInit() {
     Particle.function("assign", assignSensor);
@@ -38,20 +38,22 @@ int enumerate(String command) {
 	}
 	int i = 0;
 	uint8_t nextAddr[8];
-	sensorStr = "";
+
+	sprintf(sensorStr, "");
+	// Sensor 0: 28B3956E06000071; Sensor 1: 28B3956E06000071
 	int res = onewire.search(nextAddr);
 	while(res == TRUE) {
 		Serial.print("Found a sensor!");
 		Serial.println(i);
 
 		Sensor* newSensor = new Sensor(nextAddr);
-	    sensorStr.concat(String::format("Sensor %d: ", i));
+		sprintf(sensorStr+strlen(sensorStr), "Sensor %d: ", i);
 		for(int j=0; j<8; j++) {
-			sensorStr.concat(String::format("%02X", nextAddr[j]));
+			sprintf(sensorStr+strlen(sensorStr), "%02X", nextAddr[j]);
 		}
 		sensors[i++] = newSensor;
 		res = onewire.search(nextAddr);
-		if (res) { sensorStr.concat("; "); };
+		if (res) sprintf(sensorStr+strlen(sensorStr), "; ");
 	}
 	Serial.println(sensorStr);
 	sensorCount = i;
@@ -117,12 +119,12 @@ int updateTemps(String command) {
     	Serial.println("Sensors not set up yet...");
         return -2;
     }
-    tempsStr = "";
+
     int ret = getTemps(beerTemp, fridgeTemp);
     if (ret != 0) {
         return -1;
     }
-    tempsStr = String::format("beer:%.2f fridge:%.2f", beerTemp, fridgeTemp);
+    snprintf(tempsStr, 24, "beer:%.2f fridge:%.2f", beerTemp, fridgeTemp);
     Serial.println(tempsStr);
     return 0;
 }
@@ -142,7 +144,9 @@ int updateTarget(String command) {
 }
 
 int publishStatus(double beerTemp, double fridgeTemp, int state) {
-	Particle.publish("status", String::format("{ beerTemp: %.2f, fridgeTemp: %.2f, state: %s }",
-		beerTemp, fridgeTemp, actuatorConfig.stateNames[state]));
+	char msg[54];
+	snprintf(msg, 54, "{ beerTemp: %.2f, fridgeTemp: %.2f, state: %s }",
+			beerTemp, fridgeTemp, actuatorConfig.stateNames[state]);
+	Particle.publish("status", msg);
 	return 0;
 }
