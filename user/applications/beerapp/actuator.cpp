@@ -20,32 +20,34 @@ void FridgeActuator::doorISR () {
 // N.B. debounce delay must happen BEFORE calling this function
 void FridgeActuator::doorOpen() {
 	bool open = ! digitalRead(DOOR_PIN);
-	Serial.printf("Door pin %s, setting heat pin %s\r\n",
-					(open ? "HIGH" : "LOW"),
-					(currentState == HEATING || !open) ? "LOW" : "HIGH");
-	digitalWrite(HEAT_PIN, (currentState == HEATING || !open));
+	Serial.printf("Door is %s, setting heat pin %s\r\n",
+					(open ? "OPEN" : "CLOSED"),
+					(currentState == HEATING || open) ? "LOW" : "HIGH");
+	digitalWrite(HEAT_PIN, !(currentState == HEATING || open));
 	Particle.publish(open ? "doorOpened" : "doorClosed");
 }
 
 FridgeState FridgeActuator::changeState(FridgeState newState) {
 	lastStateChangeTime = millis();
-	Serial.printf("Actuator changing from state %s to %s\r\n",
-										actuatorConfig.stateNames[currentState],
-										actuatorConfig.stateNames[newState]);
-	Particle.publish("stateChange", String::format("%s --> %s",
-											actuatorConfig.stateNames[currentState],
-											actuatorConfig.stateNames[newState]));
+	char msg[16];
+	snprintf(msg, 16, "%s --> %s",	actuatorConfig.stateNames[currentState],
+									actuatorConfig.stateNames[newState]);
+	Serial.printf("Actuator changing state: %s\r\n", msg);
+	Particle.publish("stateChange", msg);
 	if (newState == currentState) {
 		Serial.printf("Ignoring state change request to current state of %s.\r\n",
 							actuatorConfig.stateNames[currentState]);
 		return currentState;
 	}
 	currentState = newState;
-
-	minStateTimer->changePeriod(1000*actuatorConfig.stateTimes[currentState][0]);
-	minStateTimer->start();
-	maxStateTimer->changePeriod(1000*actuatorConfig.stateTimes[currentState][1]);
-	maxStateTimer->start();
+	stateActive = false;
+	uint minTime = 1000*actuatorConfig.stateTimes[currentState][0];
+	uint maxTime = 1000*actuatorConfig.stateTimes[currentState][1];
+	Serial.printf("Starting State min/max timers: %d / %d\r\n", minTime, maxTime);
+	minStateTimer->changePeriod(minTime);
+	maxStateTimer->changePeriod(maxTime);
+	minStateTimer->reset();
+	maxStateTimer->reset();
 
 	// Set heat state if door is closed (HIGH), otherwise just leave it for the door handler
 	if (digitalRead(DOOR_PIN)) digitalWrite(HEAT_PIN, actuatorConfig.states[newState][0]);
@@ -66,9 +68,9 @@ FridgeActuator::FridgeActuator() : currentState(IDLE) {
 	lastStateChangeTime = millis();
 
 	// Initialise timers
-	debounceTimer = new Timer(40, 		 &FridgeActuator::doorOpen,				*this, true);
-	minStateTimer = new Timer(INIT_TIME, &FridgeActuator::minStateTimeExceeded, *this, true);
-	maxStateTimer = new Timer(1000, 	 &FridgeActuator::maxStateTimeExceeded, *this, true);
+	debounceTimer = new Timer(40, 	 &FridgeActuator::doorOpen,				*this, true);
+	minStateTimer = new Timer(30000, &FridgeActuator::minStateTimeExceeded, *this, true);
+	maxStateTimer = new Timer(90000, &FridgeActuator::maxStateTimeExceeded, *this, true);
 	minStateTimer->start();
 
     attachInterrupt(DOOR_PIN, &FridgeActuator::doorISR, this, CHANGE);
@@ -91,7 +93,7 @@ FridgeState FridgeActuator::update(double tgt, double curr) {
 	unsigned long now = millis();
 	double timediff = (double)(now - lastStateChangeTime) / 1000.0 ;
 
-	Serial.printf("%s min:%.2f max:%.2f diff:%.2f - ",
+	Serial.printf("%s min:%d max:%d diff:%.2f - ",
 			actuatorConfig.stateNames[currentState],
 			actuatorConfig.stateTimes[currentState][0],
 			actuatorConfig.stateTimes[currentState][1],

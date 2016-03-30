@@ -1,4 +1,5 @@
 #include "Particle.h"
+STARTUP(System.enableFeature(FEATURE_RETAINED_MEMORY));
 
 /* Includes ------------------------------------------------------------------*/
 
@@ -10,8 +11,6 @@
 #include "my_eeprom.h"
 #include "pid_control.h"
 
-uint8_t beerAddr[8] = {0,};
-uint8_t fridgeAddr[8] = {0,};
 
 
 #define INTERVAL 15000
@@ -23,7 +22,11 @@ Timer retryTimer(5000, timerRoutine, true);
 // Global Objects
 PIDControl* pidController;
 FridgeActuator* fridgeActuator;
-double targetTemp = 75.0;
+retained double targetTemp = 75.0;
+retained uint8_t beerAddr[8] = {0,};
+retained uint8_t fridgeAddr[8] = {0,};
+retained double  int_state = 0;
+
 
 void setup() {
     Serial.begin(57600);
@@ -31,7 +34,8 @@ void setup() {
     Particle.syncTime();
     cloudInit();
 
-    Serial.println("Starting beermentor...\r\n");
+    Serial.print("Starting beermentor at ");
+    Serial.println(Time.timeStr());
 
     // Read EEPROM data
     // readEeprom();

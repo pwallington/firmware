@@ -8,7 +8,6 @@
 #ifndef USER_APPLICATIONS_MYAPP_CONFIG_H_
 #define USER_APPLICATIONS_MYAPP_CONFIG_H_
 
-
 #define HEAT_PIN D7
 #define COOL_PIN D6
 #define DOOR_PIN D1
@@ -42,9 +41,9 @@ struct ActuatorConfig {
 	const double heatOvershoot = 0.4;
 
 	// Actuator state time bounds:   		 min  max
-	const double stateTimes[3][2] = {{30,  60},  // HEATING
-									{30,  60},  // COOLING
-									{30,  60}}; // IDLE
+	const unsigned int stateTimes[3][2] =  {{27,  87},  // HEATING
+											{28,  88},  // COOLING
+											{29,  89}}; // IDLE
 
 	// Actuator pin states:  		 heat  cool
 	const uint8_t states[3][2] = {{  LOW, HIGH },  // HEATING

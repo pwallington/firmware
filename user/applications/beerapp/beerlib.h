@@ -3,8 +3,9 @@
 #define BEERLIB
 
 extern OneWire onewire;
-extern uint8_t beerAddr[8];
-extern uint8_t fridgeAddr[8];
+retained extern uint8_t beerAddr[8];
+retained extern uint8_t fridgeAddr[8];
+
 
 double getTempByAddr(uint8_t addr[]);
 

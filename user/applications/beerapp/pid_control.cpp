@@ -49,6 +49,7 @@ double PIDControl::updatePID(double target, double current) {
 	}
 	Serial.printf("PID t:%.2f, c:%.2f, p:%.2f, i:%.2f, d:%.2f, at:%.2f\r\n",
 					   target, current, pErr,  iErr,   dErr,   actTarget);
+	int_state = iErr;
 	return actTarget;
 }
 
