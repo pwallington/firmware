@@ -28,24 +28,26 @@ double PIDControl::updatePID(double target, double current) {
 		avgTemp *= (pidConfig.smoothing - 1) / pidConfig.smoothing;
 		avgTemp += current / pidConfig.smoothing;
 		pErr = target - avgTemp;
-		iErr += (pErr + pErr_last)/2 * timeDiff;
+		iErr += ((pErr + pErr_last)/2.0) * timeDiff / 60.0;
 		iErr = constrain(iErr, -pidConfig.intMax, pidConfig.intMax);
 
 		// This needs some smoothing somehow
-		dErr = (pErr - pErr_last) / timeDiff;
+		dErr = (pErr - pErr_last) * 60.0 / timeDiff;
 	}
 	lastMillis = now;
+
 	double actTgtTmp = target + (pidConfig.kP * pErr)
-								+ (pidConfig.kI * iErr)
-								+ (pidConfig.kD * dErr);
+							  + (pidConfig.kI * iErr)
+							  + (pidConfig.kD * dErr);
 
 	double actTarget = constrain(actTgtTmp, pidConfig.targetMin, pidConfig.targetMax);
 
 	// back-calculate integrator state in case we constrained the target temp
 	if (pidConfig.kI && actTarget != actTgtTmp) {
 		double backCalc = (actTarget - (target + (pidConfig.kP * pErr)
-								 	 + (pidConfig.kD * dErr)) / pidConfig.kI);
-		iErr = constrain(backCalc, -pidConfig.intMax, pidConfig.intMax);
+								 	 + (pidConfig.kD * dErr))) / pidConfig.kI;
+//		iErr = constrain(backCalc, -pidConfig.intMax, pidConfig.intMax);
+		Particle.publish("backCalc", String::format("%f", backCalc));
 	}
 
 

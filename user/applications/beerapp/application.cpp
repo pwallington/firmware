@@ -20,6 +20,8 @@ Timer retryTimer(5000, timerRoutine, true);
 // Global Objects
 PIDControl* pidController;
 FridgeActuator* fridgeActuator;
+TCPClient client;
+
 retained double targetTemp = 75.0;
 retained uint8_t beerAddr[8] = {0,};
 retained uint8_t fridgeAddr[8] = {0,};
@@ -47,6 +49,7 @@ void setup() {
     delay(15000);
 
     controlTimer.start();
+    ThingSpeak.begin(client);
 }
 
 void timerRoutine() {

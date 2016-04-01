@@ -11,6 +11,9 @@
 #include "application.h"
 #include "OneWire/OneWire.h"
 #include "config.h"
+#include "ThingSpeak/ThingSpeak.h"
+
+#define TS_API_KEY "OU2ESK3M7JBHPB4H"
 
 extern OneWire onewire;
 extern double beerTemp;

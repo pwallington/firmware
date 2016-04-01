@@ -10,15 +10,19 @@
 #include "application.h"
 #include "config.h"
 
-retained extern double int_state;
+extern double int_state;
 
 class PIDControl {
 	public:
 		// returns new actuator target
 		double updatePID(double target, double current);
 
+		PIDControl(double int_val) : iErr(int_val) {
+			Particle.variable("pidStatus", pidStatusMsg);
+		};
+
 	private:
-		double iErr = int_state;
+		double iErr;
 		double avgTemp = 0;
 		double pErr_last = 0;
 		unsigned long lastMillis = 0;

@@ -164,12 +164,14 @@ int publishStatus(double beerTemp, double fridgeTemp, double target, int state, 
 	snprintf(statusStr, 65, "beer:%.2f, fridge:%.2f, target:%.2f, state:%s",
 			beerTemp, fridgeTemp, target, actuatorConfig.stateNames[state]);
 	Particle.publish("tempStatus", statusStr);
-//	ThingSpeak.setField(1,(float)beerTemp);
-//	ThingSpeak.setField(2,(float)fridgeTemp);
-//	ThingSpeak.setField(3,(float)target);
-//	ThingSpeak.setField(4,(float)actuator);
-//	ThingSpeak.setField(5,actuatorConfig.stateNames[state]);
-//	ThingSpeak.writeFields(102415, TS_API_KEY);
+
+	ThingSpeak.setField(1,(float)beerTemp);
+	ThingSpeak.setField(2,(float)fridgeTemp);
+	ThingSpeak.setField(3,(float)target);
+	ThingSpeak.setField(4,(float)actuator);
+	ThingSpeak.setField(5,actuatorConfig.stateNames[state]);
+	ThingSpeak.writeFields(102415, TS_API_KEY);
+
 	return 0;
 }
 /*Field 1 Beer
