@@ -21,8 +21,8 @@ void cloudInit();
 int enumerate(String command);
 
 int updateTemps(String command);
-int assignSensor(String command);
+int assignSensors(String command);
 int updateTarget(String command);
-int publishStatus(double beerTemp, double fridgeTemp, int state);
+int publishStatus(double beerTemp, double fridgeTemp, double target, int state, double actuator);
 
 #endif /* USER_APPLICATIONS_MYAPP_CLOUD_FUNCS_H_ */

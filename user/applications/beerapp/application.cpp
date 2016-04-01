@@ -11,9 +11,7 @@ STARTUP(System.enableFeature(FEATURE_RETAINED_MEMORY));
 #include "my_eeprom.h"
 #include "pid_control.h"
 
-
-
-#define INTERVAL 15000
+#define INTERVAL 20000
 void timerRoutine();
 Timer controlTimer(INTERVAL, timerRoutine);
 Timer retryTimer(5000, timerRoutine, true);
@@ -26,6 +24,7 @@ retained double targetTemp = 75.0;
 retained uint8_t beerAddr[8] = {0,};
 retained uint8_t fridgeAddr[8] = {0,};
 retained double  int_state = 0;
+retained bool 	 setupDone = false;
 
 String startupTime;
 
@@ -42,12 +41,12 @@ void setup() {
     // Read EEPROM data
     // readEeprom();
 
-    enumerate("");
-    pidController = new PIDControl();
+    pidController = new PIDControl(int_state);
     fridgeActuator = new FridgeActuator();
-    delay(500);
-    controlTimer.start();
 
+    delay(15000);
+
+    controlTimer.start();
 }
 
 void timerRoutine() {
@@ -58,7 +57,7 @@ void timerRoutine() {
     if (updateTemps("")) {
     	Serial.println("Bad response from updateTemps()");
 
-    	if (beerAddr[0] && fridgeAddr[0]) retryTimer.start();
+    	if (setupDone) retryTimer.start();
     	return;
     }
 

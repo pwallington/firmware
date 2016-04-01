@@ -18,8 +18,8 @@ int getTemps(double &beer, double &fridge) {
 
   startTempConvAll();
 
-  // maybe 750ms is enough, maybe not, so use 800 instead
-  delay(800);     
+  // maybe 750ms is enough, maybe not
+  delay(1000);
 
   ret = readTempData(beerAddr, b_data);
   if (ret != 0) {

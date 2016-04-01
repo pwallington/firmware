@@ -40,17 +40,17 @@ struct ActuatorConfig {
 	const double coolOvershoot = 0.8;
 	const double heatOvershoot = 0.4;
 
-	// Actuator state time bounds:   		 min  max
-	const unsigned int stateTimes[3][2] =  {{27,  87},  // HEATING
-											{28,  88},  // COOLING
-											{29,  89}}; // IDLE
+	// Actuator state time bounds:   		min, max N.B. trimmed to fire before next timer interval.
+	const unsigned int stateTimes[3][2] = {{ 57,   0},  // HEATING
+										  { 177, 598},  // COOLING
+										  { 297,   0}}; // IDLE
 
 	// Actuator pin states:  		 heat  cool
 	const uint8_t states[3][2] = {{  LOW, HIGH },  // HEATING
 								  { HIGH,  LOW },  // COOLING
 								  { HIGH, HIGH }}; // IDLE
 
-	const char stateNames[3][5] = { "HEAT", "COOL", "IDLE" };
+	const char stateNames[4][5] = { "HEAT", "COOL", "IDLE", "BOOT" };
 };
 
 extern double targetTemp;

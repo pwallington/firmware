@@ -44,10 +44,11 @@ FridgeState FridgeActuator::changeState(FridgeState newState) {
 	uint maxTime = 1000*actuatorConfig.stateTimes[currentState][1];
 	Serial.printf("Starting State min/max timers: %d / %d\r\n", minTime, maxTime);
 	minStateTimer->changePeriod(minTime);
-	maxStateTimer->changePeriod(maxTime);
 	minStateTimer->reset();
-	maxStateTimer->reset();
-
+	if (maxTime > 0) {
+		maxStateTimer->changePeriod(maxTime);
+		maxStateTimer->reset();
+	}
 	// Set heat state if door is closed (HIGH), otherwise just leave it for the door handler
 	if (digitalRead(DOOR_PIN)) digitalWrite(HEAT_PIN, actuatorConfig.states[newState][0]);
 	digitalWrite(COOL_PIN, actuatorConfig.states[newState][1]);
@@ -68,8 +69,8 @@ FridgeActuator::FridgeActuator() : currentState(IDLE) {
 
 	// Initialise timers
 	debounceTimer = new Timer(40, 	 &FridgeActuator::doorOpen,				*this, true);
-	minStateTimer = new Timer(30000, &FridgeActuator::minStateTimeExceeded, *this, true);
-	maxStateTimer = new Timer(90000, &FridgeActuator::maxStateTimeExceeded, *this, true);
+	minStateTimer = new Timer(INIT_TIME, &FridgeActuator::minStateTimeExceeded, *this, true);
+	maxStateTimer = new Timer(300000, &FridgeActuator::maxStateTimeExceeded, *this, true);
 	minStateTimer->start();
 
     attachInterrupt(DOOR_PIN, &FridgeActuator::doorISR, this, CHANGE);
