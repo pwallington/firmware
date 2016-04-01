@@ -20,17 +20,16 @@ void FridgeActuator::doorISR () {
 // N.B. debounce delay must happen BEFORE calling this function
 void FridgeActuator::doorOpen() {
 	bool open = ! digitalRead(DOOR_PIN);
-	Serial.printf("Door is %s, setting heat pin %s\r\n",
-					(open ? "OPEN" : "CLOSED"),
-					(currentState == HEATING || open) ? "LOW" : "HIGH");
-	digitalWrite(HEAT_PIN, !(currentState == HEATING || open));
+	bool newPinState = (currentState == HEATING || open) ? LOW : HIGH;
+	Serial.printf("Door is %s, setting heat pin %d\r\n", (open ? "OPEN" : "CLOSED"), newPinState);
+	digitalWrite(HEAT_PIN, newPinState);
 	Particle.publish(open ? "doorOpened" : "doorClosed");
 }
 
 FridgeState FridgeActuator::changeState(FridgeState newState) {
 	lastStateChangeTime = millis();
-	char msg[16];
-	snprintf(msg, 16, "%s --> %s",	actuatorConfig.stateNames[currentState],
+	char msg[30];
+	snprintf(msg, 30, "from:%s, to:%s",	actuatorConfig.stateNames[currentState],
 									actuatorConfig.stateNames[newState]);
 	Serial.printf("Actuator changing state: %s\r\n", msg);
 	Particle.publish("stateChange", msg);
@@ -80,12 +79,14 @@ FridgeActuator::FridgeActuator() : currentState(IDLE) {
 
 void FridgeActuator::minStateTimeExceeded() {
 	Serial.println("Exceeded state min time - now allowing state changes");
+	Particle.publish("stateMinTimePassed", actuatorConfig.stateNames[currentState]);
 	stateActive = true;
 }
 
 void FridgeActuator::maxStateTimeExceeded() {
 	// Return to idle if max state time is present and exceeded
 	Serial.println("Exceeded state max time");
+	Particle.publish("stateMaxTimePassed", actuatorConfig.stateNames[currentState]);
 	changeState(IDLE);
 }
 

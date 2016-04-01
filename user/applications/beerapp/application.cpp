@@ -27,16 +27,18 @@ retained uint8_t beerAddr[8] = {0,};
 retained uint8_t fridgeAddr[8] = {0,};
 retained double  int_state = 0;
 
+String startupTime;
 
 void setup() {
     Serial.begin(57600);
     Time.zone(-6);
     Particle.syncTime();
+    delay(2000);
+    startupTime = Time.timeStr();
+    Serial.printf("Starting beermentor at %s. Setup=%s\r\n",Time.timeStr(),(setupDone?"TRUE":"FALSE"));
+    Particle.variable("startupTime", startupTime);
+
     cloudInit();
-
-    Serial.print("Starting beermentor at ");
-    Serial.println(Time.timeStr());
-
     // Read EEPROM data
     // readEeprom();
 
@@ -69,6 +71,6 @@ void timerRoutine() {
     double fridgeTarget = pidController->updatePID(targetTemp, beerTemp);
     FridgeState ret = fridgeActuator->update(fridgeTarget, fridgeTemp);
 
-    publishStatus(beerTemp, fridgeTemp, ret);
+    publishStatus(beerTemp, fridgeTemp, targetTemp, ret, fridgeTarget);
 
 }

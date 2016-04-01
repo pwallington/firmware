@@ -47,8 +47,12 @@ double PIDControl::updatePID(double target, double current) {
 								 	 + (pidConfig.kD * dErr)) / pidConfig.kI);
 		iErr = constrain(backCalc, -pidConfig.intMax, pidConfig.intMax);
 	}
-	Serial.printf("PID t:%.2f, c:%.2f, p:%.2f, i:%.2f, d:%.2f, at:%.2f\r\n",
-					   target, current, pErr,  iErr,   dErr,   actTarget);
+
+
+	snprintf(pidStatusMsg, 64, "T:t:%.2f,c:%.2f,s:%.2f P:p:%.2f,i:%.2f,d:%.2f T:o:%.2f",
+					   target, current, avgTemp, pErr,  iErr,   dErr,   actTarget);
+	Serial.println(pidStatusMsg);
+	Particle.publish("pidStatus", pidStatusMsg);
 	int_state = iErr;
 	return actTarget;
 }

@@ -5,14 +5,31 @@
 // Cloud variables
 double beerTemp;
 double fridgeTemp;
-char beerAddrStr[20] = {0,};
-char fridgeAddrStr[20] = {0,};
-
+char statusStr[65];
 char tempsStr[25];
 Sensor* sensors[5];
 unsigned int sensorCount = 0;
+char searchStr[84];
 char sensorStr[84];
-char appname[] = "beermentor_pub";
+
+void makeSensorStr() {
+	// Initialise beer and fridge address strings in case they're already stored
+	char* tgt = sensorStr;
+	tgt[0] = 0;
+	if (beerAddr[0] == 0x28) {
+		tgt += sprintf(tgt, "beer: %02X-%02X%02X%02X-%02X%02X%02X%02X",beerAddr[0],
+				beerAddr[1], beerAddr[2], beerAddr[3],
+				beerAddr[4], beerAddr[5], beerAddr[6], beerAddr[7]);
+	}
+	if 	(tgt != sensorStr) {
+		tgt += sprintf(tgt, ", ");
+	}
+	if (fridgeAddr[0] == 0x28) {
+		tgt += sprintf(tgt,	"fridge: %02X-%02X%02X%02X-%02X%02X%02X%02X", fridgeAddr[0],
+				fridgeAddr[1], fridgeAddr[2], fridgeAddr[3],
+				fridgeAddr[4], fridgeAddr[5], fridgeAddr[6], fridgeAddr[7]);
+	}
+}
 
 void cloudInit() {
     Particle.function("assign", assignSensor);
@@ -39,7 +56,8 @@ int enumerate(String command) {
 	int i = 0;
 	uint8_t nextAddr[8];
 
-	sprintf(sensorStr, "");
+	searchStr[0] = 0;
+	// Target format:
 	// Sensor 0: 28B3956E06000071; Sensor 1: 28B3956E06000071
 	int res = onewire.search(nextAddr);
 	while(res == TRUE) {
@@ -47,15 +65,15 @@ int enumerate(String command) {
 		Serial.println(i);
 
 		Sensor* newSensor = new Sensor(nextAddr);
-		sprintf(sensorStr+strlen(sensorStr), "Sensor %d: ", i);
+		sprintf(searchStr+strlen(searchStr), "Sensor %d: ", i);
 		for(int j=0; j<8; j++) {
-			sprintf(sensorStr+strlen(sensorStr), "%02X", nextAddr[j]);
+			sprintf(searchStr+strlen(searchStr), "%02X", nextAddr[j]);
 		}
 		sensors[i++] = newSensor;
 		res = onewire.search(nextAddr);
-		if (res) sprintf(sensorStr+strlen(sensorStr), "; ");
+		if (res) sprintf(searchStr+strlen(searchStr), "; ");
 	}
-	Serial.println(sensorStr);
+	Serial.println(searchStr);
 	sensorCount = i;
 	return sensorCount;
 }
@@ -73,7 +91,6 @@ int assignSensor(String command) {
 
     while (tok) {
     	uint8_t* tgtAddr;
-    	char* 	 tgtStr;
     	const char* name;
 
 		//convert ASCII to integer
@@ -86,28 +103,16 @@ int assignSensor(String command) {
 
 		if(tok[2] == 'b') {
 			tgtAddr = beerAddr;
-			tgtStr  = beerAddrStr;
 			name = "beer";
 		}
 		else if(tok[2] == 'f') {
 			tgtAddr = fridgeAddr;
-			tgtStr  = fridgeAddrStr;
 			name = "fridge";
 		}
 		else return -2;
 
 		memcpy(tgtAddr, sensors[sensorNumber]->addr, 8);
-		sprintf(tgtStr, "%02X-%02X%02X%02X %02X%02X%02X%02X",
-					sensors[sensorNumber]->addr[0],
-					sensors[sensorNumber]->addr[1],
-					sensors[sensorNumber]->addr[2],
-					sensors[sensorNumber]->addr[3],
-					sensors[sensorNumber]->addr[4],
-					sensors[sensorNumber]->addr[5],
-					sensors[sensorNumber]->addr[6],
-					sensors[sensorNumber]->addr[7]);
-
-		Serial.printf("Assigned sensor %d to \"%s\" (%s)\r\n", sensorNumber, name, tgtStr);
+		Serial.printf("Assigned sensor %d to \"%s\"\r\n", sensorNumber, name);
 		tok = strtok(NULL, " ");
     }
     return 0;
@@ -124,9 +129,7 @@ int updateTemps(String command) {
     if (ret != 0) {
         return -1;
     }
-    snprintf(tempsStr, 24, "beer:%.2f fridge:%.2f", beerTemp, fridgeTemp);
-    Serial.println(tempsStr);
-    return 0;
+	return 0;
 }
 
 int updateTarget(String command) {

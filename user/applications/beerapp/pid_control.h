@@ -22,6 +22,7 @@ class PIDControl {
 		double avgTemp = 0;
 		double pErr_last = 0;
 		unsigned long lastMillis = 0;
+		char pidStatusMsg[64];
 };
 
 
