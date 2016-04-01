@@ -110,10 +110,17 @@ typedef enum
     SYSTEM_FLAG_STARTUP_SAFE_LISTEN_MODE,
 
     /**
+     * When 0, the system doesn't reset network connection on cloud connection errors.
+     * When 1 (default), the system resets network connection after a number of failed attempts to
+     * connect to the cloud.
+     */
+    SYSTEM_FLAG_RESET_NETWORK_ON_CLOUD_ERROR,
+
+    /**
      * When 0, the application code is not paused.
      * When 1, the application code is paused.
      */
-    // SYSTEM_FLAG_APPLICATION_PAUSED=4,
+    // SYSTEM_FLAG_APPLICATION_PAUSED,
 
     SYSTEM_FLAG_MAX
 
