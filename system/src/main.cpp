@@ -425,7 +425,7 @@ extern "C" void HAL_SysTick_Handler(void)
         if (TimingFlashUpdateTimeout >= TIMING_FLASH_UPDATE_TIMEOUT)
         {
             //Reset is the only way now to recover from stuck OTA update
-            HAL_Core_System_Reset();
+            HAL_Core_System_Reset_Ex(RESET_REASON_UPDATE_TIMEOUT, 0, nullptr);
         }
         else
         {
@@ -571,6 +571,9 @@ void app_setup_and_loop(void)
     HAL_Core_Init();
     // We have running firmware, otherwise we wouldn't have gotten here
     DECLARE_SYS_HEALTH(ENTERED_Main);
+
+    // Ensure last reset info is loaded
+    HAL_Core_Get_System_Reset_Info(nullptr, nullptr, nullptr);
 
 #if Wiring_Cellular == 1
     system_power_management_init();

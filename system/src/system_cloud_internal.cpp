@@ -576,6 +576,16 @@ int Spark_Handshake(bool presence_announce)
             Particle.publish("spark/" SPARK_SUBSYSTEM_EVENT_NAME, buf, 60, PRIVATE);
         }
 #endif
+        int resetReason = RESET_REASON_NONE;
+        uint32_t resetData = 0;
+        if (HAL_Core_Get_System_Reset_Info(&resetReason, &resetData, nullptr))
+        {
+            char buf[16];
+            snprintf(buf, sizeof(buf), "%d", resetReason);
+            Particle.publish("spark/device/last_reset/reason", buf, 60, PRIVATE);
+            snprintf(buf, sizeof(buf), "0x%02x", (unsigned)resetData);
+            Particle.publish("spark/device/last_reset/data", buf, 60, PRIVATE);
+        }
 
         if (presence_announce)
         		Multicast_Presence_Announcement();

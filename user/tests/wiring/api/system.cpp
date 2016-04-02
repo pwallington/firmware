@@ -160,3 +160,8 @@ test(system_events)
     API_COMPILE(System.on(my_events, handler_event_data_param));
     (void)clicks; // avoid unused variable warning
 }
+
+test(system_reset_reason)
+{
+    API_COMPILE(System.resetReason());
+}

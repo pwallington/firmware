@@ -158,7 +158,7 @@ bool system_fileTransfer(system_file_transfer_t* tx, void* reserved)
             if (tx->descriptor.store==FileTransfer::Store::FIRMWARE) {
                 serialObj->println("Restarting system to apply firmware update...");
                 HAL_Delay_Milliseconds(100);
-                HAL_Core_System_Reset();
+                HAL_Core_System_Reset_Ex(RESET_REASON_UPDATE, 0, nullptr);
             }
         }
     }

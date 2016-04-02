@@ -130,6 +130,24 @@ void HAL_Core_System_Reset(void)
     exit(0);
 }
 
+void HAL_Core_System_Reset_Ex(int reason, uint32_t data, void *reserved)
+{
+    HAL_Core_System_Reset();
+}
+
+bool HAL_Core_Get_System_Reset_Info(int *reason, uint32_t *data, void *reserved)
+{
+    if (reason)
+    {
+        *reason = RESET_REASON_NONE;
+    }
+    if (data)
+    {
+        *data = 0;
+    }
+    return false;
+}
+
 void HAL_Core_Factory_Reset(void)
 {
     MSG("Factory reset not implemented.");

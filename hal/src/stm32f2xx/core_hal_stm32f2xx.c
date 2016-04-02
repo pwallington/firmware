@@ -169,11 +169,19 @@ void UsageFault_Handler(void)
 
 /* Private typedef -----------------------------------------------------------*/
 
+typedef struct System_Reset_Info {
+    uint8_t loaded;
+    uint16_t reason;
+    uint32_t data;
+} System_Reset_Info;
+
 /* Private define ------------------------------------------------------------*/
 
 /* Private macro -------------------------------------------------------------*/
 
 /* Private variables ---------------------------------------------------------*/
+
+static System_Reset_Info system_reset_info = { 0 };
 
 /* Private function prototypes -----------------------------------------------*/
 void (*HAL_TIM1_Handler)(void);
@@ -249,7 +257,7 @@ void HAL_Core_Config(void)
     // where WICED isn't ready for a SysTick until after main() has been called to
     // fully intialize the RTOS.
     HAL_Core_Setup_override_interrupts();
-    
+
 #if MODULAR_FIRMWARE
     // write protect system module parts if not already protected
     FLASH_WriteProtectMemory(FLASH_INTERNAL, CORE_FW_ADDRESS, USER_FIRMWARE_IMAGE_LOCATION - CORE_FW_ADDRESS, true);
@@ -281,6 +289,9 @@ void HAL_Core_Setup(void) {
     bootloader_update_if_needed();
     HAL_Bootloader_Lock(true);
 
+    /* Clear reset flags */
+    RCC_ClearFlag();
+
 #if !defined(MODULAR_FIRMWARE)
     module_user_init_hook();
 #endif
@@ -292,7 +303,7 @@ bool HAL_Core_Validate_User_Module(void)
 {
     bool valid = false;
 
-    if (!SYSTEM_FLAG(StartupMode_SysFlag) & 1)
+    if (!(SYSTEM_FLAG(StartupMode_SysFlag) & 1)) // Safe mode flag
     {
         //CRC verification Enabled by default
         if (FLASH_isUserModuleInfoValid(FLASH_INTERNAL, USER_FIRMWARE_IMAGE_LOCATION, USER_FIRMWARE_IMAGE_LOCATION))
@@ -355,7 +366,71 @@ void HAL_Core_Factory_Reset(void)
 {
     system_flags.Factory_Reset_SysFlag = 0xAAAA;
     Save_SystemFlags();
+    HAL_Core_System_Reset_Ex(RESET_REASON_FACTORY_RESET, 0, NULL);
+}
+
+void HAL_Core_System_Reset_Ex(int reason, uint32_t data, void *reserved)
+{
+    // Write reset info to DCT
+    const uint16_t r = reason;
+    dct_write_app_data(&r, DCT_RESET_REASON_OFFSET, sizeof(r));
+    dct_write_app_data(&data, DCT_RESET_REASON_DATA_OFFSET, sizeof(data));
     HAL_Core_System_Reset();
+}
+
+bool HAL_Core_Get_System_Reset_Info(int *reason, uint32_t *data, void *reserved)
+{
+    if (!system_reset_info.loaded)
+    {
+        if (HAL_Core_System_Reset_FlagSet(SOFTWARE_RESET)) // Software reset
+        {
+            // Read reset info from DCT
+            system_reset_info.reason = *(uint16_t*)dct_read_app_data(DCT_RESET_REASON_OFFSET);
+            system_reset_info.data = *(uint32_t*)dct_read_app_data(DCT_RESET_REASON_DATA_OFFSET);
+        }
+        else // Hardware reset
+        {
+            if (HAL_Core_System_Reset_FlagSet(WATCHDOG_RESET))
+            {
+                system_reset_info.reason = RESET_REASON_WATCHDOG;
+            }
+            else if (HAL_Core_System_Reset_FlagSet(POWER_MANAGEMENT_RESET))
+            {
+                system_reset_info.reason = RESET_REASON_POWER_MANAGEMENT;
+            }
+            else if (HAL_Core_System_Reset_FlagSet(POWER_DOWN_RESET))
+            {
+                system_reset_info.reason = RESET_REASON_POWER_DOWN;
+            }
+            else if (HAL_Core_System_Reset_FlagSet(BROWNOUT_RESET))
+            {
+                system_reset_info.reason = RESET_REASON_BROWNOUT;
+            }
+            else if (HAL_Core_System_Reset_FlagSet(PIN_RESET)) // Pin reset flag should be checked in the last place
+            {
+                system_reset_info.reason = RESET_REASON_PIN_RESET;
+            }
+            else
+            {
+                system_reset_info.reason = RESET_REASON_UNKNOWN;
+            }
+            system_reset_info.data = 0; // Not used
+        }
+        system_reset_info.loaded = 1;
+        // Clear reset info stored in DCT
+        const uint32_t d = 0;
+        dct_write_app_data(&d, DCT_RESET_REASON_OFFSET, 2); // uint16_t
+        dct_write_app_data(&d, DCT_RESET_REASON_DATA_OFFSET, 4); // uint32_t
+    }
+    if (reason)
+    {
+        *reason = system_reset_info.reason;
+    }
+    if (data)
+    {
+        *data = system_reset_info.data;
+    }
+    return true;
 }
 
 void HAL_Core_Enter_Bootloader(bool persist)
@@ -371,13 +446,13 @@ void HAL_Core_Enter_Bootloader(bool persist)
         RTC_WriteBackupRegister(RTC_BKP_DR1, ENTER_DFU_APP_REQUEST);
     }
 
-    HAL_Core_System_Reset();
+    HAL_Core_System_Reset_Ex(RESET_REASON_DFU_MODE, 0, NULL);
 }
 
 void HAL_Core_Enter_Safe_Mode(void* reserved)
 {
     RTC_WriteBackupRegister(RTC_BKP_DR1, ENTER_SAFE_MODE_APP_REQUEST);
-    HAL_Core_System_Reset();
+    HAL_Core_System_Reset_Ex(RESET_REASON_SAFE_MODE, 0, NULL);
 }
 
 void HAL_Core_Enter_Stop_Mode(uint16_t wakeUpPin, uint16_t edgeTriggerMode, long seconds)
@@ -437,7 +512,7 @@ void HAL_Core_Enter_Stop_Mode(uint16_t wakeUpPin, uint16_t edgeTriggerMode, long
          * - To wake up from the Stop mode with an RTC alarm event, it is necessary to:
          * - Configure the EXTI Line 17 to be sensitive to rising edges (Interrupt
          * or Event modes) using the EXTI_Init() function.
-         * 
+         *
          */
         HAL_RTC_Cancel_UnixAlarm();
         HAL_RTC_Set_UnixAlarm((time_t) seconds);
@@ -976,8 +1051,16 @@ bool HAL_Core_System_Reset_FlagSet(RESET_TypeDef resetType)
         RCC_Flag = RCC_FLAG_IWDGRST;
         break;
 
-    case LOW_POWER_RESET:
+    case POWER_MANAGEMENT_RESET:
         RCC_Flag = RCC_FLAG_LPWRRST;
+        break;
+
+    case POWER_DOWN_RESET:
+        RCC_Flag = RCC_FLAG_PORRST;
+        break;
+
+    case BROWNOUT_RESET:
+        RCC_Flag = RCC_FLAG_BORRST;
         break;
     }
 
