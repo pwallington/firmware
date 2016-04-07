@@ -25,9 +25,9 @@ void SystemClass::dfu(bool persist)
     HAL_Core_Enter_Bootloader(persist);
 }
 
-void SystemClass::reset(uint32_t data)
+void SystemClass::reset(void)
 {
-    HAL_Core_System_Reset_Ex(RESET_REASON_USER, data, nullptr);
+    HAL_Core_System_Reset_Ex(RESET_REASON_USER, 0, nullptr);
 }
 
 void SystemClass::sleep(Spark_Sleep_TypeDef sleepMode, long seconds, SleepNetworkFlag network)
