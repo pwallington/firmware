@@ -170,8 +170,7 @@ void UsageFault_Handler(void)
 /* Private typedef -----------------------------------------------------------*/
 
 typedef struct System_Reset_Info {
-    uint8_t loaded;
-    uint16_t reason;
+    int reason;
     uint32_t data;
 } System_Reset_Info;
 
@@ -199,6 +198,49 @@ void HAL_CAN2_TX_Handler(void) __attribute__ ((weak));
 void HAL_CAN2_RX0_Handler(void) __attribute__ ((weak));
 void HAL_CAN2_RX1_Handler(void) __attribute__ ((weak));
 void HAL_CAN2_SCE_Handler(void) __attribute__ ((weak));
+
+/* Private functions ---------------------------------------------------------*/
+
+static void Init_System_Reset_Info()
+{
+    if (HAL_Core_System_Reset_FlagSet(SOFTWARE_RESET))
+    {
+        // Load reset info from backup registers
+        system_reset_info.reason = RTC_ReadBackupRegister(RTC_BKP_DR2);
+        system_reset_info.data = RTC_ReadBackupRegister(RTC_BKP_DR3);
+    }
+    else // Hardware reset
+    {
+        if (HAL_Core_System_Reset_FlagSet(WATCHDOG_RESET))
+        {
+            system_reset_info.reason = RESET_REASON_WATCHDOG;
+        }
+        else if (HAL_Core_System_Reset_FlagSet(POWER_MANAGEMENT_RESET))
+        {
+            system_reset_info.reason = RESET_REASON_POWER_MANAGEMENT;
+        }
+        else if (HAL_Core_System_Reset_FlagSet(POWER_DOWN_RESET))
+        {
+            system_reset_info.reason = RESET_REASON_POWER_DOWN;
+        }
+        else if (HAL_Core_System_Reset_FlagSet(BROWNOUT_RESET))
+        {
+            system_reset_info.reason = RESET_REASON_BROWNOUT;
+        }
+        else if (HAL_Core_System_Reset_FlagSet(PIN_RESET)) // Pin reset flag should be checked in the last place
+        {
+            system_reset_info.reason = RESET_REASON_PIN_RESET;
+        }
+        else
+        {
+            system_reset_info.reason = RESET_REASON_UNKNOWN;
+        }
+        system_reset_info.data = 0; // Not used
+    }
+    // Clear backup registers
+    RTC_WriteBackupRegister(RTC_BKP_DR2, 0);
+    RTC_WriteBackupRegister(RTC_BKP_DR3, 0);
+}
 
 /* Extern variables ----------------------------------------------------------*/
 extern __IO uint16_t BUTTON_DEBOUNCED_TIME[];
@@ -272,7 +314,8 @@ void HAL_Core_Config(void)
                                       FACTORY_RESET_MODULE_FUNCTION, MODULE_VERIFY_CRC|MODULE_VERIFY_FUNCTION|MODULE_VERIFY_DESTINATION_IS_START_ADDRESS); //true to verify the CRC during copy also
 #endif
 
-
+    Init_System_Reset_Info();
+    RCC_ClearFlag(); // Ensure reset flags are cleared
 }
 
 #if !MODULAR_FIRMWARE
@@ -288,9 +331,6 @@ void HAL_Core_Setup(void) {
 
     bootloader_update_if_needed();
     HAL_Bootloader_Lock(true);
-
-    /* Clear reset flags */
-    RCC_ClearFlag();
 
 #if !defined(MODULAR_FIRMWARE)
     module_user_init_hook();
@@ -371,66 +411,19 @@ void HAL_Core_Factory_Reset(void)
 
 void HAL_Core_System_Reset_Ex(int reason, uint32_t data, void *reserved)
 {
-    // Write reset info to DCT
-    const uint16_t r = reason;
-    dct_write_app_data(&r, DCT_RESET_REASON_OFFSET, sizeof(r));
-    dct_write_app_data(&data, DCT_RESET_REASON_DATA_OFFSET, sizeof(data));
+    // Save reset info to backup registers
+    RTC_WriteBackupRegister(RTC_BKP_DR2, reason);
+    RTC_WriteBackupRegister(RTC_BKP_DR3, data);
     HAL_Core_System_Reset();
 }
 
-bool HAL_Core_Get_System_Reset_Info(int *reason, uint32_t *data, void *reserved)
+int HAL_Core_Get_System_Reset_Reason(uint32_t *data, void *reserved)
 {
-    if (!system_reset_info.loaded)
-    {
-        if (HAL_Core_System_Reset_FlagSet(SOFTWARE_RESET)) // Software reset
-        {
-            // Read reset info from DCT
-            system_reset_info.reason = *(uint16_t*)dct_read_app_data(DCT_RESET_REASON_OFFSET);
-            system_reset_info.data = *(uint32_t*)dct_read_app_data(DCT_RESET_REASON_DATA_OFFSET);
-        }
-        else // Hardware reset
-        {
-            if (HAL_Core_System_Reset_FlagSet(WATCHDOG_RESET))
-            {
-                system_reset_info.reason = RESET_REASON_WATCHDOG;
-            }
-            else if (HAL_Core_System_Reset_FlagSet(POWER_MANAGEMENT_RESET))
-            {
-                system_reset_info.reason = RESET_REASON_POWER_MANAGEMENT;
-            }
-            else if (HAL_Core_System_Reset_FlagSet(POWER_DOWN_RESET))
-            {
-                system_reset_info.reason = RESET_REASON_POWER_DOWN;
-            }
-            else if (HAL_Core_System_Reset_FlagSet(BROWNOUT_RESET))
-            {
-                system_reset_info.reason = RESET_REASON_BROWNOUT;
-            }
-            else if (HAL_Core_System_Reset_FlagSet(PIN_RESET)) // Pin reset flag should be checked in the last place
-            {
-                system_reset_info.reason = RESET_REASON_PIN_RESET;
-            }
-            else
-            {
-                system_reset_info.reason = RESET_REASON_UNKNOWN;
-            }
-            system_reset_info.data = 0; // Not used
-        }
-        system_reset_info.loaded = 1;
-        // Clear reset info stored in DCT
-        const uint32_t d = 0;
-        dct_write_app_data(&d, DCT_RESET_REASON_OFFSET, 2); // uint16_t
-        dct_write_app_data(&d, DCT_RESET_REASON_DATA_OFFSET, 4); // uint32_t
-    }
-    if (reason)
-    {
-        *reason = system_reset_info.reason;
-    }
     if (data)
     {
         *data = system_reset_info.data;
     }
-    return true;
+    return system_reset_info.reason;
 }
 
 void HAL_Core_Enter_Bootloader(bool persist)
@@ -1032,44 +1025,30 @@ void HAL_Bootloader_Lock(bool lock)
         FLASH_WriteProtection_Disable(BOOTLOADER_FLASH_PAGES);
 }
 
+static inline bool Is_System_Reset_Flag_Set(uint8_t flag)
+{
+    return SYSTEM_FLAG(RCC_CSR_SysFlag) & ((uint32_t)1 << (flag & 0x1f));
+}
+
 bool HAL_Core_System_Reset_FlagSet(RESET_TypeDef resetType)
 {
-    uint8_t FLAG_Mask = 0x1F;
-    uint8_t RCC_Flag = 0;
-
     switch(resetType)
     {
     case PIN_RESET:
-        RCC_Flag = RCC_FLAG_PINRST;
-        break;
-
+        return Is_System_Reset_Flag_Set(RCC_FLAG_PINRST);
     case SOFTWARE_RESET:
-        RCC_Flag = RCC_FLAG_SFTRST;
-        break;
-
+        return Is_System_Reset_Flag_Set(RCC_FLAG_SFTRST);
     case WATCHDOG_RESET:
-        RCC_Flag = RCC_FLAG_IWDGRST;
-        break;
-
+        return Is_System_Reset_Flag_Set(RCC_FLAG_IWDGRST) || Is_System_Reset_Flag_Set(RCC_FLAG_WWDGRST);
     case POWER_MANAGEMENT_RESET:
-        RCC_Flag = RCC_FLAG_LPWRRST;
-        break;
-
+        return Is_System_Reset_Flag_Set(RCC_FLAG_LPWRRST);
     case POWER_DOWN_RESET:
-        RCC_Flag = RCC_FLAG_PORRST;
-        break;
-
+        return Is_System_Reset_Flag_Set(RCC_FLAG_PORRST);
     case BROWNOUT_RESET:
-        RCC_Flag = RCC_FLAG_BORRST;
-        break;
+        return Is_System_Reset_Flag_Set(RCC_FLAG_BORRST);
+    default:
+        return false;
     }
-
-    if ((RCC_Flag != 0) && (SYSTEM_FLAG(RCC_CSR_SysFlag) & ((uint32_t)1 << (RCC_Flag & FLAG_Mask))))
-    {
-        return true;
-    }
-
-    return false;
 }
 
 unsigned HAL_Core_System_Clock(HAL_SystemClock clock, void* reserved)

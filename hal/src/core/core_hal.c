@@ -37,6 +37,11 @@ extern void linkme();
 
 /* Private typedef -----------------------------------------------------------*/
 
+typedef struct System_Reset_Info {
+    int reason;
+    uint32_t data;
+} System_Reset_Info;
+
 /* Private define ------------------------------------------------------------*/
 
 /* Private macro -------------------------------------------------------------*/
@@ -44,9 +49,53 @@ extern void linkme();
 /* Private variables ---------------------------------------------------------*/
 volatile uint8_t IWDG_SYSTEM_RESET;
 
+static System_Reset_Info system_reset_info = { 0 };
+
 /* Extern variables ----------------------------------------------------------*/
 
 /* Private function prototypes -----------------------------------------------*/
+
+/* Private functions ---------------------------------------------------------*/
+
+static void Init_System_Reset_Info()
+{
+    if (HAL_Core_System_Reset_FlagSet(SOFTWARE_RESET))
+    {
+        // Load reset info from backup registers
+        system_reset_info.reason = BKP_ReadBackupRegister(BKP_DR2);
+        const uint16_t hi = BKP_ReadBackupRegister(BKP_DR3);
+        const uint16_t lo = BKP_ReadBackupRegister(BKP_DR4);
+        system_reset_info.data = ((uint32_t)hi << 16) | (uint32_t)lo;
+    }
+    else // Hardware reset
+    {
+        if (HAL_Core_System_Reset_FlagSet(WATCHDOG_RESET))
+        {
+            system_reset_info.reason = RESET_REASON_WATCHDOG;
+        }
+        else if (HAL_Core_System_Reset_FlagSet(POWER_MANAGEMENT_RESET))
+        {
+            system_reset_info.reason = RESET_REASON_POWER_MANAGEMENT;
+        }
+        else if (HAL_Core_System_Reset_FlagSet(POWER_DOWN_RESET))
+        {
+            system_reset_info.reason = RESET_REASON_POWER_DOWN;
+        }
+        else if (HAL_Core_System_Reset_FlagSet(PIN_RESET)) // Pin reset flag should be checked in the last place
+        {
+            system_reset_info.reason = RESET_REASON_PIN_RESET;
+        }
+        else
+        {
+            system_reset_info.reason = RESET_REASON_UNKNOWN;
+        }
+        system_reset_info.data = 0; // Not used
+    }
+    // Clear backup registers
+    BKP_WriteBackupRegister(BKP_DR2, 0);
+    BKP_WriteBackupRegister(BKP_DR3, 0);
+    BKP_WriteBackupRegister(BKP_DR4, 0);
+}
 
 void HAL_Core_Init(void)
 {
@@ -120,6 +169,9 @@ void HAL_Core_Config(void)
 
 	sFLASH_Init();
 
+    Init_System_Reset_Info();
+    RCC_ClearFlag(); // Ensure reset flags are cleared
+
         module_user_init_hook();
 }
 
@@ -166,6 +218,24 @@ void HAL_Core_Factory_Reset(void)
 	Factory_Reset_SysFlag = 0xAAAA;
 	Save_SystemFlags();
 	HAL_Core_System_Reset();
+}
+
+void HAL_Core_System_Reset_Ex(int reason, uint32_t data, void *reserved)
+{
+    // Save reset info to backup registers
+    BKP_WriteBackupRegister(BKP_DR2, reason);
+    BKP_WriteBackupRegister(BKP_DR3, data >> 16);
+    BKP_WriteBackupRegister(BKP_DR4, data & 0xffff);
+    HAL_Core_System_Reset();
+}
+
+int HAL_Core_Get_System_Reset_Reason(uint32_t *data, void *reserved)
+{
+    if (data)
+    {
+        *data = system_reset_info.data;
+    }
+    return system_reset_info.reason;
 }
 
 void HAL_Core_Enter_Safe_Mode(void* reserved)
@@ -448,6 +518,30 @@ void HAL_Bootloader_Lock(bool lock)
         FLASH_WriteProtection_Enable(BOOTLOADER_FLASH_PAGES);
     else
         FLASH_WriteProtection_Disable(BOOTLOADER_FLASH_PAGES);
+}
+
+static inline bool Is_System_Reset_Flag_Set(uint8_t flag)
+{
+    return SYSTEM_FLAG(RCC_CSR_SysFlag) & ((uint32_t)1 << (flag & 0x1f));
+}
+
+bool HAL_Core_System_Reset_FlagSet(RESET_TypeDef resetType)
+{
+    switch(resetType)
+    {
+    case PIN_RESET:
+        return Is_System_Reset_Flag_Set(RCC_FLAG_PINRST);
+    case SOFTWARE_RESET:
+        return Is_System_Reset_Flag_Set(RCC_FLAG_SFTRST);
+    case WATCHDOG_RESET:
+        return Is_System_Reset_Flag_Set(RCC_FLAG_IWDGRST) || Is_System_Reset_Flag_Set(RCC_FLAG_WWDGRST);
+    case POWER_MANAGEMENT_RESET:
+        return Is_System_Reset_Flag_Set(RCC_FLAG_LPWRRST);
+    case POWER_DOWN_RESET:
+        return Is_System_Reset_Flag_Set(RCC_FLAG_PORRST);
+    default:
+        return false;
+    }
 }
 
 uint32_t freeheap();

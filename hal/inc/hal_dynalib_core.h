@@ -69,7 +69,7 @@ DYNALIB_FN(23, hal_core, HAL_Core_Enter_Safe_Mode, void(void*))
 DYNALIB_FN(24, hal_core, HAL_Feature_Get, bool(HAL_Feature))
 DYNALIB_FN(25, hal_core, HAL_Feature_Set, int(HAL_Feature, bool))
 DYNALIB_FN(26, hal_core, HAL_Core_System_Reset_Ex, void(int, uint32_t, void*))
-DYNALIB_FN(27, hal_core, HAL_Core_Get_System_Reset_Info, bool(int*, uint32_t*, void*))
+DYNALIB_FN(27, hal_core, HAL_Core_Get_System_Reset_Reason, int(uint32_t*, void*))
 
 DYNALIB_END(hal_core)
 

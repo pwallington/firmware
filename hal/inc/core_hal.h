@@ -56,7 +56,7 @@ typedef enum
     BROWNOUT_RESET = 0x06
 } RESET_TypeDef;
 
-typedef enum Reset_Reason
+typedef enum System_Reset_Reason
 {
     RESET_REASON_NONE = 0,
     RESET_REASON_UNKNOWN = 10, // Unspecified reason
@@ -75,7 +75,7 @@ typedef enum Reset_Reason
     RESET_REASON_DFU_MODE = 120, // DFU mode requested
     RESET_REASON_PANIC = 130, // System panic (additional data may contain panic code)
     RESET_REASON_USER = 140 // User-requested reset
-} Reset_Reason;
+} System_Reset_Reason;
 
 /* Exported constants --------------------------------------------------------*/
 
@@ -123,7 +123,7 @@ void HAL_Core_System_Reset(void);
 void HAL_Core_Factory_Reset(void);
 
 void HAL_Core_System_Reset_Ex(int reason, uint32_t data, void *reserved);
-bool HAL_Core_Get_System_Reset_Info(int *reason, uint32_t *data, void *reserved);
+int HAL_Core_Get_System_Reset_Reason(uint32_t *data, void *reserved);
 
 /**
  * Notification from hal to the external system.

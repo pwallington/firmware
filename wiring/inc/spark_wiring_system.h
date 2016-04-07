@@ -86,7 +86,7 @@ public:
 
     static void factoryReset(void);
     static void dfu(bool persist=false);
-    static void reset(void);
+    static void reset(uint32_t data = 0);
 
     static void enterSafeMode(void) {
         HAL_Core_Enter_Safe_Mode(NULL);
@@ -254,11 +254,9 @@ public:
     }
 
 
-    inline int resetReason()
+    inline int resetReason(uint32_t *data = nullptr)
     {
-        int reason = RESET_REASON_NONE;
-        HAL_Core_Get_System_Reset_Info(&reason, nullptr, nullptr);
-        return reason;
+        return HAL_Core_Get_System_Reset_Reason(data, nullptr);
     }
 
 private:

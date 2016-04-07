@@ -33,6 +33,11 @@ test(system_api) {
     API_COMPILE(System.enterSafeMode());
 
     API_COMPILE(System.reset());
+    API_COMPILE(System.reset(0)); // User data
+
+    uint32_t data = 0;
+    API_COMPILE(System.resetReason());
+    API_COMPILE(System.resetReason(&data));
 
     API_COMPILE(System.sleep(60));
 
@@ -159,9 +164,4 @@ test(system_events)
     API_COMPILE(System.on(my_events, handler_event_data));
     API_COMPILE(System.on(my_events, handler_event_data_param));
     (void)clicks; // avoid unused variable warning
-}
-
-test(system_reset_reason)
-{
-    API_COMPILE(System.resetReason());
 }
