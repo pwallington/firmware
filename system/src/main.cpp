@@ -572,9 +572,6 @@ void app_setup_and_loop(void)
     // We have running firmware, otherwise we wouldn't have gotten here
     DECLARE_SYS_HEALTH(ENTERED_Main);
 
-    // Ensure last reset info is loaded
-    HAL_Core_Get_System_Reset_Info(nullptr, nullptr, nullptr);
-
 #if Wiring_Cellular == 1
     system_power_management_init();
 #endif
