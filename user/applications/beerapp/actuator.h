@@ -18,6 +18,7 @@ enum FridgeState {
 	HEATING = 0,
 	COOLING = 1,
 	IDLE 	= 2,
+	BOOT	= 3
 };
 
 class FridgeActuator {

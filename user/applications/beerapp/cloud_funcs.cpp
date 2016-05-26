@@ -1,5 +1,5 @@
-#include <cloud_funcs.h>
-#include "sensor.h"
+#include "cloud_funcs.h"
+#include "beerlib.h"
 #include "config.h"
 
 // Cloud variables
@@ -7,10 +7,15 @@ double beerTemp;
 double fridgeTemp;
 char statusStr[65];
 char tempsStr[25];
-Sensor* sensors[5];
+//Sensor* sensors[5];
+uint8_t sensors[5][8] = { { 0, }, };
 unsigned int sensorCount = 0;
 char searchStr[84];
 char sensorStr[84];
+char pidStatusMsg[64];
+TCPClient client;
+PIDConfig pidConfig;
+Timer* resetTimer;
 
 void makeSensorStr() {
 	// Initialise beer and fridge address strings in case they're already stored
@@ -40,7 +45,7 @@ void cloudInit() {
         makeSensorStr();
 		Particle.variable("sensors", sensorStr);
 		Particle.variable("status", statusStr);
-
+		ThingSpeak.begin(client);
         // Initialise and publish temp readings
 //        if(!updateTemps("")) publishStatus(beerTemp, fridgeTemp, targetTemp, 4, 0);
     } else {
@@ -50,6 +55,7 @@ void cloudInit() {
     	Particle.function("search", enumerate);
         Particle.function("assign", assignSensors);
         Particle.variable("search", searchStr);
+		Particle.variable("pidStatus", pidStatusMsg);
         enumerate("");
     }
 }
@@ -57,9 +63,8 @@ void cloudInit() {
 /* Enumerate the sensors so they can be assigned to roles */
 int enumerate(String command) {
 	for (int i = 0; i < 5; ++i) {
-		if (sensors[i]) {
-			delete sensors[i];
-			sensors[i] = NULL;
+		if (sensors[i][0]) {
+			sensors[i][0] = 0;
 		}
 	}
 	int i = 0;
@@ -73,14 +78,14 @@ int enumerate(String command) {
 		Serial.print("Found a sensor!");
 		Serial.println(i);
 
-		Sensor* newSensor = new Sensor(nextAddr);
+		memcpy(sensors[i], nextAddr, 8);
 		sprintf(searchStr+strlen(searchStr), "Sensor %d: ", i);
 		for(int j=0; j<8; j++) {
 			sprintf(searchStr+strlen(searchStr), "%02X", nextAddr[j]);
 		}
-		sensors[i++] = newSensor;
 		res = onewire.search(nextAddr);
 		if (res) sprintf(searchStr+strlen(searchStr), "; ");
+		i += 1;
 	}
 	Serial.println(searchStr);
 	sensorCount = i;
@@ -120,14 +125,15 @@ int assignSensors(String command) {
 		}
 		else return -2;
 
-		memcpy(tgtAddr, sensors[sensorNumber]->addr, 8);
+		memcpy(tgtAddr, sensors[sensorNumber], 8);
 		Serial.printf("Assigned sensor %d to \"%s\"\r\n", sensorNumber, name);
 		tok = strtok(NULL, " ");
     }
 	makeSensorStr();
 	if (beerAddr[0] == 0x28 && fridgeAddr[0] == 0x28) {
 		setupDone = true;
-		System.reset();
+		resetTimer = new Timer(1000, System.reset);
+		resetTimer->start();
 	}
     return 0;
 }
@@ -161,17 +167,18 @@ int updateTarget(String command) {
 }
 
 int publishStatus(double beerTemp, double fridgeTemp, double target, int state, double actuator) {
-	snprintf(statusStr, 65, "beer:%.2f, fridge:%.2f, target:%.2f, state:%s",
-			beerTemp, fridgeTemp, target, actuatorConfig.stateNames[state]);
+	Serial.print("Status: ");
+	sprintf(statusStr, "beer:%.2f, fridge:%.2f, target:%.2f, state:%s",
+							  beerTemp,  fridgeTemp, 	  target, actuatorConfig.stateNames[state]);
 	Particle.publish("tempStatus", statusStr);
+	Serial.println(statusStr);
 
 	ThingSpeak.setField(1,(float)beerTemp);
 	ThingSpeak.setField(2,(float)fridgeTemp);
 	ThingSpeak.setField(3,(float)target);
 	ThingSpeak.setField(4,(float)actuator);
-	ThingSpeak.setField(5,actuatorConfig.stateNames[state]);
-	ThingSpeak.writeFields(102415, TS_API_KEY);
-
+	ThingSpeak.setField(5, actuatorConfig.stateNames[state]);
+	ThingSpeak.writeFields(TS_CHANNEL, TS_API_KEY);
 	return 0;
 }
 /*Field 1 Beer

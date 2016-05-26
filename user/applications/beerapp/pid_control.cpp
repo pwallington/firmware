@@ -7,22 +7,28 @@
 
 #include "pid_control.h"
 
-PIDConfig pidConfig;
+double avgTemp = 0;
+double pErr_last = 0;
+unsigned long lastMillis = 0;
 
-double PIDControl::updatePID(double target, double current) {
+double updatePID(double target, double current) {
 	double pErr = 0;
 	double dErr = 0;
-	unsigned long now = millis();
+	double actTgtTmp = 0;
+	double actTarget = 0;
 
+	unsigned long now = millis();
+    Serial.println("In PID Update"); //delay(500);
 	if (lastMillis == 0) {
 		avgTemp = current;
 		pErr = target - current;
-		iErr = 0;
-		dErr = 0;
+	    Serial.println("Fist PID Update!"); //delay(500);
 	} else {
 		// Make sure we can't get a div/0?
 		double timeDiff = (double)(now - lastMillis)/1000.0;
 		timeDiff = 0.1 > timeDiff ? 0.1 : timeDiff;
+		Serial.print("Timediff = ");
+		Serial.println(timeDiff); //delay(500);
 
 		pErr_last = pErr;
 		avgTemp *= (pidConfig.smoothing - 1) / pidConfig.smoothing;
@@ -35,27 +41,31 @@ double PIDControl::updatePID(double target, double current) {
 		dErr = (pErr - pErr_last) * 60.0 / timeDiff;
 	}
 	lastMillis = now;
+	Serial.printf("calculating target temp (%d)\r\n", lastMillis);//delay(1000);
 
-	double actTgtTmp = target + (pidConfig.kP * pErr)
-							  + (pidConfig.kI * iErr)
-							  + (pidConfig.kD * dErr);
+	actTgtTmp = target + (pidConfig.kP * pErr) + (pidConfig.kI * iErr) + (pidConfig.kD * dErr);
 
-	double actTarget = constrain(actTgtTmp, pidConfig.targetMin, pidConfig.targetMax);
+	Serial.print("Actuator target:"); Serial.println(actTgtTmp);//delay(500);
+
+	actTarget = constrain(actTgtTmp, pidConfig.targetMin, pidConfig.targetMax);
+	Serial.print("Constrained target:"); Serial.println(actTarget);//delay(500);
 
 	// back-calculate integrator state in case we constrained the target temp
 	if (pidConfig.kI && actTarget != actTgtTmp) {
-		double backCalc = (actTarget - (target + (pidConfig.kP * pErr)
-								 	 + (pidConfig.kD * dErr))) / pidConfig.kI;
+		Serial.println("Doing back-calculation"); //delay(500);
+		double backCalc = (actTarget - target - (pidConfig.kP * pErr) - (pidConfig.kD * dErr)) / pidConfig.kI;
 //		iErr = constrain(backCalc, -pidConfig.intMax, pidConfig.intMax);
-		Particle.publish("backCalc", String::format("%f", backCalc));
+//		Particle.publish("backCalc", String::format("%f", backCalc));
+		Serial.print("BackCalc:"); Serial.println(backCalc); //delay(500);
 	}
 
+//	Somehow this causes a hard fault?!
+//	snprintf(pidStatusMsg, 63, "T:t:%.2f,c:%.2f,s:%.2f P:p:%.2f,i:%.2f,d:%.2f T:o:%.2f",
+//					   			target, current, avgTemp, pErr,  iErr,   dErr,   actTarget);
+//	Serial.println(pidStatusMsg);
+//	Particle.publish("pidStatus", pidStatusMsg);
 
-	snprintf(pidStatusMsg, 64, "T:t:%.2f,c:%.2f,s:%.2f P:p:%.2f,i:%.2f,d:%.2f T:o:%.2f",
-					   target, current, avgTemp, pErr,  iErr,   dErr,   actTarget);
-	Serial.println(pidStatusMsg);
-	Particle.publish("pidStatus", pidStatusMsg);
-	int_state = iErr;
+	Serial.println("PID Update finished");// delay(500);
 	return actTarget;
 }
 

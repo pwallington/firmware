@@ -5,51 +5,50 @@ STARTUP(System.enableFeature(FEATURE_RETAINED_MEMORY));
 
 #include "stdarg.h"
 #include "beerlib.h"
-#include "OneWire/OneWire.h"
+#include "OneWire.h"
 #include "cloud_funcs.h"
 #include "actuator.h"
 #include "my_eeprom.h"
 #include "pid_control.h"
 
-#define INTERVAL 20000
+//#define INTERVAL 60000
+#define INTERVAL 5000
+
 void timerRoutine();
 Timer controlTimer(INTERVAL, timerRoutine);
 Timer retryTimer(5000, timerRoutine, true);
 
 
 // Global Objects
-PIDControl* pidController;
 FridgeActuator* fridgeActuator;
-TCPClient client;
+
 
 retained double targetTemp = 75.0;
 retained uint8_t beerAddr[8] = {0,};
 retained uint8_t fridgeAddr[8] = {0,};
-retained double  int_state = 0;
+retained double  iErr = 0;
 retained bool 	 setupDone = false;
 
 String startupTime;
 
 void setup() {
-    Serial.begin(57600);
+    Serial.begin(115200);
     Time.zone(-6);
     Particle.syncTime();
     delay(2000);
     startupTime = Time.timeStr();
-    Serial.printf("Starting beermentor at %s. Setup=%s\r\n",Time.timeStr(),(setupDone?"TRUE":"FALSE"));
+    Serial.printf("Starting beermentor at %s. Setup=%s\r\n",startupTime.c_str(),(setupDone?"TRUE":"FALSE"));
     Particle.variable("startupTime", startupTime);
 
     cloudInit();
     // Read EEPROM data
     // readEeprom();
 
-    pidController = new PIDControl(int_state);
     fridgeActuator = new FridgeActuator();
 
-    delay(15000);
+//    delay(15000);
 
     controlTimer.start();
-    ThingSpeak.begin(client);
 }
 
 void timerRoutine() {
@@ -70,9 +69,15 @@ void timerRoutine() {
     }
 
 //    double fridgeTarget = targetTemp;
-    double fridgeTarget = pidController->updatePID(targetTemp, beerTemp);
+    Serial.println("Calling PID Update"); delay(500);
+    double fridgeTarget = updatePID(targetTemp, beerTemp);
+
+//    FridgeState ret = BOOT;
+    Serial.println("Calling Actuator Update"); delay(500);
     FridgeState ret = fridgeActuator->update(fridgeTarget, fridgeTemp);
 
+    Serial.println("Calling Publish Update"); delay(500);
+    Serial.printf("Oh God: %.2f %.2f %.2f %d\r\n", beerTemp, fridgeTemp, targetTemp, ret);
     publishStatus(beerTemp, fridgeTemp, targetTemp, ret, fridgeTarget);
 
 }

@@ -8,8 +8,8 @@
 #ifndef USER_APPLICATIONS_MYAPP_CONFIG_H_
 #define USER_APPLICATIONS_MYAPP_CONFIG_H_
 
-#define HEAT_PIN D7
-#define COOL_PIN D6
+#define HEAT_PIN D4
+#define COOL_PIN D3
 #define DOOR_PIN D1
 
 

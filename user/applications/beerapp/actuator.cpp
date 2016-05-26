@@ -8,7 +8,7 @@
 #include "actuator.h"
 #include "config.h"
 
-#define INIT_TIME 10 * 1000
+#define INIT_TIME 1 * 1000
 
 ActuatorConfig actuatorConfig;
 
@@ -92,24 +92,25 @@ void FridgeActuator::maxStateTimeExceeded() {
 }
 
 FridgeState FridgeActuator::update(double tgt, double curr) {
+	double diff = curr - tgt;
+	FridgeState newState = currentState;
+	Serial.println("In Actuator update"); delay(500);
 	unsigned long now = millis();
 	double timediff = (double)(now - lastStateChangeTime) / 1000.0 ;
 
-	Serial.printf("%s min:%d max:%d diff:%.2f - ",
-			actuatorConfig.stateNames[currentState],
-			actuatorConfig.stateTimes[currentState][0],
-			actuatorConfig.stateTimes[currentState][1],
-			timediff);
-
+//	Serial.printf("%s min:%d max:%d diff:%.2f - ",
+//			actuatorConfig.stateNames[currentState],
+//			actuatorConfig.stateTimes[currentState][0],
+//			actuatorConfig.stateTimes[currentState][1],
+//			timediff);
+	delay(500);
 	if (stateActive == false) {
 		// Waiting on state minimum time
-		Serial.println("Waiting on state min time.");
+		Serial.println("Waiting on state min time."); delay(500);
 		return currentState;
 	}
-
-	double diff = curr - tgt;
-	Serial.printf("Considering state change.\r\n Delta:%.2f-%.2f = %.2f  ", curr, tgt, diff);
-	FridgeState newState = currentState;
+	Serial.println("State is active!"); delay(500);
+	Serial.printf("Considering state change.\r\n  Delta:");Serial.println(diff);delay(500);
 	switch (currentState) {
 	case HEATING:
 		// Heating, curr is less than tgt, diff is -ve
