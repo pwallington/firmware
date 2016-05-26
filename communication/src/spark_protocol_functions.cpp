@@ -86,8 +86,9 @@ int spark_protocol_presence_announcement(ProtocolFacade* protocol, uint8_t *buf,
 }
 
 bool spark_protocol_send_event(ProtocolFacade* protocol, const char *event_name, const char *data,
-                int ttl, EventType::Enum event_type, void*) {
-    return protocol->send_event(event_name, data, ttl, event_type);
+                int ttl, uint32_t flags, void*) {
+	EventType::Enum event_type = EventType::extract_event_type(flags);
+	return protocol->send_event(event_name, data, ttl, event_type, flags);
 }
 
 bool spark_protocol_send_subscription_device(ProtocolFacade* protocol, const char *event_name, const char *device_id, void*) {
@@ -131,8 +132,20 @@ void spark_protocol_get_product_details(ProtocolFacade* protocol, product_detail
     protocol->get_product_details(*details);
 }
 
-
-
+int spark_protocol_set_connection_property(ProtocolFacade* protocol, unsigned property_id,
+                                           unsigned data, void* datap, void* reserved)
+{
+    if (property_id == particle::protocol::Connection::PING)
+    {
+        protocol->set_keepalive(data);
+    }
+    return 0;
+}
+int spark_protocol_command(ProtocolFacade* protocol, ProtocolCommands::Enum cmd, uint32_t data, void* reserved)
+{
+	protocol->command(cmd, data);
+	return 0;
+}
 
 #else
 
@@ -171,7 +184,8 @@ int spark_protocol_presence_announcement(SparkProtocol* protocol, unsigned char 
 }
 
 bool spark_protocol_send_event(SparkProtocol* protocol, const char *event_name, const char *data,
-                int ttl, EventType::Enum event_type, void*) {
+                int ttl, uint32_t flags, void*) {
+	EventType::Enum event_type = EventType::extract_event_type(flags);
     return protocol->send_event(event_name, data, ttl, event_type);
 }
 
@@ -214,6 +228,17 @@ void spark_protocol_set_product_firmware_version(SparkProtocol* protocol, produc
 void spark_protocol_get_product_details(SparkProtocol* protocol, product_details_t* details, void* reserved) {
     (void)reserved;
     protocol->get_product_details(*details);
+}
+
+int spark_protocol_set_connection_property(ProtocolFacade* protocol, unsigned property_id,
+                                           unsigned data, void* datap, void* reserved)
+{
+    return 0;
+}
+
+int spark_protocol_command(ProtocolFacade* protocol, ProtocolCommands::Enum cmd, uint32_t data, void* reserved)
+{
+	return 0;
 }
 
 #endif

@@ -36,7 +36,7 @@ void DTLSProtocol::init(const char *id,
 	ProtocolError error = channel.init(keys.core_private, determine_der_length(keys.core_private, MAX_DEVICE_PRIVATE_KEY_LENGTH),
 			extracted_core_public, len,
 		keys.server_public, determine_der_length(keys.server_public, MAX_SERVER_PUBLIC_KEY_LENGTH),
-		(const uint8_t*)id, channelCallbacks, &channel.next_id_ref());
+		(const uint8_t*)device_id, channelCallbacks, &channel.next_id_ref());
 	if (error)
 	{
 		WARN("error initializing DTLS channel: %d", error);
@@ -47,6 +47,23 @@ void DTLSProtocol::init(const char *id,
 		Protocol::init(callbacks, descriptor);
 	}
 
+}
+
+
+void DTLSProtocol::sleep(uint32_t timeout)
+{
+	system_tick_t start = millis();
+	INFO("waiting for Confirmed messages to be sent.");
+	while (channel.has_unacknowledged_requests() && (millis()-start)<timeout)
+	{
+		ProtocolError error = channel.receive_confirmations();
+		if (error)
+		{
+			WARN("error receiving acknowledgements: %d", error);
+			break;
+		}
+	}
+	INFO("all Confirmed messages sent.");
 }
 
 
